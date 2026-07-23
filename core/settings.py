@@ -35,7 +35,7 @@ SECRET_KEY = 'django-insecure-*^bkl1weor@3boii)(bgh1gxnd@5u*++f*lsr@k=-*rz$)z(4+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", ]
 
 
 # Application definition
@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "cloudinary_storage",
     'django.contrib.staticfiles',
     "cloudinary",
+    
 
 
     "rest_framework",   
@@ -146,7 +147,7 @@ AUTH_USER_MODEL = "user.User"
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     "AUTH_HEADERS_TYPES": ("Bearer",),
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
@@ -185,14 +186,24 @@ CLOUDINARY_STORAGE = {
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"  
 
 
-if os.getenv("DB_NAME"):
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = os.getenv("EMAIL_HOST")
-    EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
-    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-    DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL","noreply@yourdomain.com")
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    DEFAULT_FROM_EMAIL = "testing@todolist.com"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL","noreply@yourdomain.com")
+
+
+
+
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True

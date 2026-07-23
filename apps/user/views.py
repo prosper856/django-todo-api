@@ -9,7 +9,8 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from apps.base.account_utils import send_otp_email, set_user_otp
-from apps.user.serializers import UserCreateSerializer, UserDetialSerializer, UserSerializer, LoginSerializer, ChangePasswordSerializer, OTPVerificationSerializer, PasswordResetRequestSerializer, CompletePasswordResetSerializer, UserUpadteSerializer,UserDetialSerializer
+from apps.user.serializers import UserCreateSerializer, UserDetailSerializer, UserSerializer, LoginSerializer, ChangePasswordSerializer, OTPVerificationSerializer, PasswordResetRequestSerializer, CompletePasswordResetSerializer, UserUpdateSerializer
+from core.utils import send_welcome_email
 
 
 User = get_user_model()
@@ -24,7 +25,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return UserSerializer
         elif self.action == 'retrieve':
-            return UserDetialSerializer
+            return UserDetailSerializer
         elif self.action == 'create':
             return UserCreateSerializer
         elif self.action == 'admin_users':  # Add this condition
@@ -36,15 +37,17 @@ class UserViewSet(viewsets.ModelViewSet):
            return [AllowAny()]
         elif self.action in ['update', 'partial_update', 'destroy']:
              return [IsAuthenticated()]
+        elif self.action == 'admin_users':
+            return [IsAuthenticated(), IsAdminUser()]
         else:
-            return [IsAuthenticated(), IsAdminUser]
+            return [IsAuthenticated(), IsAdminUser()]
         return [perm() for perm in permission_classes]
 
 
     @extend_schema(
         request=UserCreateSerializer,
         responses={
-            201: UserDetialSerializer,
+            201: UserDetailSerializer,
             400: OpenApiResponse(description="Bad Request"),
             401: OpenApiResponse(description="Unauthorized"),   
         },
@@ -53,10 +56,17 @@ class UserViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-
-
+    
+    
+    def perform_create(self, serializer):
+        user = serializer.save()
+        try:
+            name = getattr(user, "first_name", "") or user.email
+            send_welcome_email(user_email=user.email, username=name)
+        except Exception as e:
+            print(f"Email failed to send: {e}")
     @extend_schema(
-        responses={
+    responses={
             200: UserSerializer,
             400: OpenApiResponse(description="Bad Request"),
             401: OpenApiResponse(description="Unauthorized"),   
@@ -70,7 +80,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         responses={
-            200: UserDetialSerializer,
+            200: UserDetailSerializer,
             400: OpenApiResponse(description="Bad Request"),
             401: OpenApiResponse(description="Unauthorized"),   
         },
@@ -82,9 +92,9 @@ class UserViewSet(viewsets.ModelViewSet):
     
 
     @extend_schema(
-        request=UserUpadteSerializer,
+        request=UserUpdateSerializer,
         responses={
-            200: UserDetialSerializer,
+            200: UserDetailSerializer,
             400: OpenApiResponse(description="Bad Request"),
             401: OpenApiResponse(description="Unauthorized"),   
         },

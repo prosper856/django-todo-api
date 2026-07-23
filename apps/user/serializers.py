@@ -14,7 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "is_active", "is_staff"]
 
 
-class UserDetialSerializer(serializers.ModelSerializer):
+class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "email", "first_name", "last_name", "user_types", "is_active", "is_staff"]
@@ -107,7 +107,7 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Account is deleted")
 
 
-class UserUpadteSerializer(serializers.ModelSerializer):
+class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("first_name", "last_name", "user_types", "email")
