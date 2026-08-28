@@ -13,29 +13,26 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-import environ
+import dj_database_url
 
 
-env = environ.Env()
-Debug=(bool, False)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))  # Load environment variables from .env file
 
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-*^bkl1weor@3boii)(bgh1gxnd@5u*++f*lsr@k=-*rz$)z(4+'
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", ]
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost 127.0.0.1 .onrender.com").split(" ")
 
 
 # Application definition
@@ -52,7 +49,10 @@ INSTALLED_APPS = [
     
 
 
-    "rest_framework",   
+    "rest_framework",
+    "drf_spectacular",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
     "apps.Todos",
@@ -61,9 +61,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    'django.middleware.security.SecurityMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -90,16 +91,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
-
-
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
+  
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        conn_health_checks=True
+    )
+
 }
 
 
@@ -138,6 +139,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT =BASE_DIR / "staticfiles"
+
+
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaClodinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 
@@ -146,26 +158,18 @@ AUTH_USER_MODEL = "user.User"
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
+    'ROTATE_REFRESH_TOKENS': True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADERS_TYPES": ("Bearer",),
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 
-SWAGGER_SETTINGS = {
-    "SECURITY_DEFINITIONS": {
-        "Bearer": {
-            "type": "apiKey",
-            "in": "header",
-            "name": "Authorization",
-            "description": "Type \"Bearer \" followed by your JWT token to authenticate. Example: \"Bearer 12345abcdef\"",
 
-        }
-    },
-    "USE_SESSION_AUTH": True,
-    "JSON_EDITOR": True,
-}
 
 
 REST_FRAMEWORK = {
@@ -175,6 +179,46 @@ REST_FRAMEWORK = {
         "DEFAULT_PERMISSION_CLASSES": (
             "rest_framework.permissions.IsAuthenticated",
         ),
+        "DEFAULT_THROTTLE_CLASSES": [
+            "rest_framework.throttling.AnonRateThrottle",
+            "rest_framework.throttling.UserRateThrottle",
+        ],
+        "DEFAULT_THROTTLE_RATE": {
+            "anon": "5/minute",
+            "user": "1000/day",
+            "auth_endpoints": "5/min",
+        },
+        "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+
+}
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Todo List API",
+    "DESCRIPTION": "OpenAPI documentation for user authentication and todo list management.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS":{
+        "operationsSorter": None,
+    },
+    "SECURITY": [
+        {
+            "jwtAuth": [],
+        }
+    ],
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "jwtAuth": {
+                "type": "http",
+                "in": "header",
+                "name": "Authorization",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "ENTER YOUR ACCESS TOKEN ONLY. DO NOT INCLUDE 'Bearer' IN THE TOKEN."
+            }
+        }
+    }
 }
 
 
@@ -187,9 +231,10 @@ DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp-relay.brevo.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL") == "True"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL","noreply@yourdomain.com")

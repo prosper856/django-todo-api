@@ -20,9 +20,9 @@ class Category(models.Model):
 
 class TodoItem(models.Model):
     PRIORITY_CHOICES = [
-        ("H", "High"),
-        ("M", "Medium"),
         ("L", "Low"),
+        ("M", "Medium"),
+        ("H", "High"),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='todos')
