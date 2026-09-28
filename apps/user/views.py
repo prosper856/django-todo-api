@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.base.permissions import IsAdminOrOwner
+from apps.base.account_utils import send_otp_email  # Ensure send_otp_email is imported
 from apps.user.serializers import (
     UserSerializer,
     UserCreateSerializer,
@@ -60,8 +61,20 @@ class UserViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         return [IsAuthenticated(), IsAdminOrOwner()]
 
-    # The welcome email is sent after email verification (see EmailVerificationView),
-    # since the account is inactive right after signup.
+    def perform_create(self, serializer):
+        # 1. Save user with is_active=False
+        user = serializer.save(is_active=False)
+
+        # 2. Generate a 6-digit OTP code if not already created in serializer
+        otp = f"{secrets.randbelow(1000000):06d}"
+        user.otp = otp
+        user.save(update_fields=["otp"])
+
+        # 3. Send the OTP email immediately upon registration
+        try:
+            send_otp_email(user.id, otp, "account_verification")
+        except Exception:
+            logger.exception("Failed to send signup OTP email for user id=%s", user.id)
 
 
 @extend_schema(tags=["Authentication"])
